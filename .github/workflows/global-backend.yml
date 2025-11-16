@@ -44,14 +44,14 @@ jobs:
 
       # 4. Initialize Terraform locally on github runner
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend=false
 
       # 5. Apply global backend infrastructure
       # - Creates S3 bucket for state
       # - Creates DynamoDB table for state locking
       # - Creates IAM OIDC provider + IAM policy
       - name: Apply Global Backend
-        run: terraform apply -var-file=global.tfvars -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" -auto-approve
+        run: terraform apply -var-file=global.tfvars -var="aws_account_id=${{ vars.AWS_ACCOUNT_ID }}" -auto-approve
 
       # 6. Export Terraform outputs to JSON file
       - name: Export Outputs
@@ -69,29 +69,10 @@ jobs:
           STATE_TABLE=$(jq -r 'state_table_name.value' tf_outputs.json)
           REGION=$(jq -r 'region.value' tf_outputs.json)
 
-          aws ssm put-parameter --name "/tf/${{ env.ENVIRONMENT }}/backend/state-bucket" --value "$STATE_BUCKET" --type String
-          aws ssm put-parameter --name "/tf/${{ env.ENVIRONMENT }}/backend/state-table"  --value "$STATE_TABLE"  --type String
-          aws ssm put-parameter --name "/tf/${{ env.ENVIRONMENT }}/backend/region" --value "$REGION" --type String
+          aws ssm put-parameter --name "/tf/global-backend/state-bucket" --value "$STATE_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/state-table"  --value "$STATE_TABLE"  --type String
+          aws ssm put-parameter --name "/tf/global-backend/region" --value "$REGION" --type String
 
           echo "STATE_BUCKET=$STATE_BUCKET" >> $GITHUB_ENV
           echo "STATE_TABLE=$STATE_TABLE" >> $GITHUB_ENV
           echo "REGION=$REGION" >> $GITHUB_ENV
-
-      # 9. Configure remote backend file after resources exist
-      - name: Configure remote backend
-        run: |
-          cat > remote-state.tf <<EOT
-          terraform {
-            backend "s3" {
-              bucket         = "$STATE_BUCKET"
-              key            = "$ENVIRONMENT/terraform.tfstate"
-              region         = "$REGION"
-              dynamodb_table = "$STATE_TABLE"
-              encrypt        = true
-            }
-          }
-          EOT
-      # 10. Migrate local state to remote backend
-      # - Migrates github runner local state into the new global S3 & DynamoDB backend
-      - name: Migrate global state
-        run: terraform init -migrate-state -force-copy -input=false

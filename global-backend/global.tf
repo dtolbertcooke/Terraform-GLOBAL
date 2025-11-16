@@ -72,8 +72,8 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:PutBucketPolicy"
         ],
         "Resource" : [
-          "arn:aws:s3:::${module.s3_state_bucket.bucket_name}",
-          "arn:aws:s3:::${module.s3_state_bucket.bucket_name}/*"
+          "arn:aws:s3:::${module.s3_state_bucket.state_bucket_name}",
+          "arn:aws:s3:::${module.s3_state_bucket.state_bucket_name}/*"
         ]
       },
       {
@@ -87,7 +87,7 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:Scan",
           "dynamodb:UpdateItem"
         ],
-        "Resource" : "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/${module.dynamodb_state_table.dynamodb_state_table_name}"
+        "Resource" : "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/${module.dynamodb_state_table.state_table_name}"
       },
       {
         "Sid" : "TerraformNetworkingAccess",
