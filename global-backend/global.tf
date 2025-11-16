@@ -185,8 +185,8 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:ListBucket"
         ],
         "Resource" : [
-          "arn:aws:s3:::${module.s3_state_bucket.state_bucket_name}",
-          "arn:aws:s3:::${module.s3_state_bucket.state_bucket_name}/*",
+          "arn:aws:s3:::${module.s3_state_bucket.bucket_name}",
+          "arn:aws:s3:::${module.s3_state_bucket.bucket_name}/*",
           "arn:aws:s3:::${module.lambda_code_bucket_dev.bucket_name}",
           "arn:aws:s3:::${module.lambda_code_bucket_dev.bucket_name}/*",
           "arn:aws:s3:::${module.lambda_code_bucket_test.bucket_name}",

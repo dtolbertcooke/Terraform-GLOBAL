@@ -1,5 +1,5 @@
 output "state_bucket_name" {
-  value = module.s3_state_bucket.state_bucket_name
+  value = module.s3_state_bucket.bucket_name
 }
 
 output "state_table_name" {
