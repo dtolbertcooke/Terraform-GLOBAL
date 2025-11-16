@@ -185,9 +185,9 @@ resource "aws_iam_policy" "github_actions_policy" {
         Effect = "Allow"
         Action = ["ssm:GetParameters", "ssm:GetParameter"]
         Resource = [
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/*/backend/bucket",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/*/backend/region",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/*/backend/table"
+          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-bucket",
+          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-table",
+          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/region"
         ]
       },
       {
