@@ -65,9 +65,9 @@ jobs:
       # - This lets next workflow get the backend config dynamically
       - name: Store Backend Config in AWS SSM
         run: |
-          STATE_BUCKET=$(jq -r 'state_bucket_name.value' tf_outputs.json)
-          STATE_TABLE=$(jq -r 'state_table_name.value' tf_outputs.json)
-          REGION=$(jq -r 'region.value' tf_outputs.json)
+          STATE_BUCKET=$(jq -r '.state_bucket_name.value' tf_outputs.json)
+          STATE_TABLE=$(jq -r '.state_table_name.value' tf_outputs.json)
+          REGION=$(jq -r '.region.value' tf_outputs.json)
 
           aws ssm put-parameter --name "/tf/global-backend/state-bucket" --value "$STATE_BUCKET" --type String
           aws ssm put-parameter --name "/tf/global-backend/state-table"  --value "$STATE_TABLE"  --type String
