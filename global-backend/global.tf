@@ -80,84 +80,6 @@ resource "aws_iam_policy" "github_actions_policy" {
     "Version" : "2012-10-17",
     "Statement" : [
       {
-        Sid      = "AllowCreateLambdaFunctions"
-        Effect   = "Allow"
-        Action   = "lambda:CreateFunction"
-        Resource = "*"
-      },
-      {
-        Sid    = "AllowRegisterScalableTarget"
-        Effect = "Allow"
-        Action = [
-          "application-autoscaling:RegisterScalableTarget",
-          "application-autoscaling:PutScalingPolicy",
-          "application-autoscaling:DeleteScalingPolicy",
-          "application-autoscaling:DescribeScalingPolicies",
-          "application-autoscaling:DescribeScalableTargets",
-          "application-autoscaling:ListTagsForResource"
-        ]
-        Resource = "*"
-      },
-      {
-        Sid      = "AllowPassLambdaExecutionRole"
-        Effect   = "Allow"
-        Action   = "iam:PassRole"
-        Resource = "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-*"
-        Condition = {
-          StringEquals = {
-            "iam:PassedToService" = "lambda.amazonaws.com"
-          }
-        }
-      },
-      {
-        Sid    = "AllowPassRoles"
-        Effect = "Allow"
-        Action = ["iam:PassRole"]
-        Resource = [
-          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-global-infra",
-          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-dev",
-          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-test",
-          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-prod",
-          "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-dev",
-          "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-test",
-          "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-prod"
-        ]
-      },
-      {
-        Sid    = "AllowLambdaFunctions"
-        Effect = "Allow"
-        Action = [
-          "lambda:UpdateFunctionCode",
-          "lambda:GetFunction",
-          "lambda:DeleteFunction",
-          "lambda:GetPolicy",
-          "lambda:ListVersionsByFunction",
-          "lambda:GetFunctionCodeSigningConfig",
-          "lambda:AddPermission",
-          "lambda:TagResource"
-        ]
-        Resource = [
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-GET*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PUT*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PATCH*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-DELETE*"
-        ]
-      },
-      {
-        Sid      = "AllowCreateDynamoDBTable"
-        Effect   = "Allow"
-        Action   = ["dynamodb:CreateTable"]
-        Resource = "*"
-        Condition = {
-          StringLike = {
-            "dynamodb:TableName" = [
-              "fruit-api-lock-table-*",
-              "fruit-api-table-*"
-            ]
-          }
-        }
-      },
-      {
         "Sid" : "TerraformS3BucketAccess",
         "Effect" : "Allow",
         "Action" : [
@@ -196,22 +118,22 @@ resource "aws_iam_policy" "github_actions_policy" {
         ]
       },
       {
-        Sid    = "AllowCreateS3Buckets"
-        Effect = "Allow"
-        Action = [
+        "Sid" : "TerraformS3Global",
+        "Effect" : "Allow",
+        "Action" : [
           "s3:CreateBucket",
           "s3:GetBucketLocation",
           "s3:HeadBucket",
           "s3:GetBucketTagging",
           "s3:PutBucketTagging",
           "s3:PutBucketAcl"
-        ]
-        Resource = "*"
+        ],
+        "Resource" : "*"
       },
       {
-        Sid    = "AllowPDynamoDB"
-        Effect = "Allow"
-        Action = [
+        "Sid" : "TerraformDynamoDBAccess",
+        "Effect" : "Allow",
+        "Action" : [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:UpdateTable",
@@ -222,14 +144,66 @@ resource "aws_iam_policy" "github_actions_policy" {
           "dynamodb:UpdateContinuousBackups",
           "dynamodb:DescribeTimeToLive",
           "dynamodb:DescribeContinuousBackups",
-          "dynamodb:DescribeContinuousBackups",
           "dynamodb:ListTagsOfResource"
-        ]
-        Resource = [
+        ],
+        "Resource" : [
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/fruit-api-lock-table-${var.environment}",
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/fruit-api-table-*",
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/${module.dynamodb_state_table.state_table_name}"
         ]
+      },
+      {
+        "Sid" : "TerraformDynamoDBGlobal",
+        "Effect" : "Allow",
+        "Action" : ["dynamodb:CreateTable"],
+        "Resource" : "*",
+        "Condition" : {
+          "StringLike" : {
+            "dynamodb:TableName" : [
+              "fruit-api-lock-table-*",
+              "fruit-api-table-*"
+            ]
+          }
+        }
+      },
+      {
+        "Sid" : "TerraformLambdaAccess",
+        "Effect" : "Allow",
+        "Action" : [
+          "lambda:UpdateFunctionCode",
+          "lambda:GetFunction",
+          "lambda:DeleteFunction",
+          "lambda:GetPolicy",
+          "lambda:ListVersionsByFunction",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:AddPermission",
+          "lambda:TagResource"
+        ],
+        "Resource" : [
+          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-GET*",
+          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PUT*",
+          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PATCH*",
+          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-DELETE*"
+        ]
+      },
+      {
+        "Sid" : "TerraformLambdaGlobal",
+        "Effect" : "Allow",
+        "Action" : "lambda:CreateFunction",
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "TerraformAutoScalingAccess",
+        "Effect" : "Allow",
+        "Action" : [
+          "application-autoscaling:RegisterScalableTarget",
+          "application-autoscaling:PutScalingPolicy",
+          "application-autoscaling:DeleteScalingPolicy",
+          "application-autoscaling:DescribeScalingPolicies",
+          "application-autoscaling:DescribeScalableTargets",
+          "application-autoscaling:ListTagsForResource"
+        ],
+        "Resource" : "*"
       },
       {
         "Sid" : "TerraformNetworkingAccess",
@@ -302,15 +276,41 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:CreatePolicy",
           "iam:DeletePolicy",
           "iam:GetRole",
+          "iam:GetRolePolicy",
           "iam:ListRoles",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
           "iam:ListPolicies",
-          "iam:PassRole"
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListPolicyVersions",
+          "iam:TagRole",
+          "iam:TagPolicy",
+          "iam:ListInstanceProfilesForRole"
         ],
         "Resource" : [
-          "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-dev",
-          "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-test",
-          "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-prod"
+          "arn:aws:iam::${var.aws_account_id}:role/*",
+          "arn:aws:iam::${var.aws_account_id}:policy/*"
         ]
+      },
+      {
+        "Sid" : "TerraformIAMPassRoleConditioned",
+        "Effect" : "Allow",
+        "Action" : "iam:PassRole",
+        "Resource" : [
+          "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-*",
+          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-*",
+          "arn:aws:iam::${var.aws_account_id}:role/vpc-flow-log-role-*"
+        ],
+        "Condition" : {
+          "StringEquals" : {
+            "iam:PassedToService" : [
+              "lambda.amazonaws.com",
+              "apigateway.amazonaws.com",
+              "vpc-flow-logs.amazonaws.com"
+            ]
+          }
+        }
       },
       {
         "Sid" : "TerraformAssumeRole",
@@ -323,10 +323,10 @@ resource "aws_iam_policy" "github_actions_policy" {
         ]
       },
       {
-        Sid    = "AllowSSMParameters"
-        Effect = "Allow"
-        Action = ["ssm:GetParameters", "ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"]
-        Resource = [
+        "Sid" : "TerraformSSMAccess",
+        "Effect" : "Allow",
+        "Action" : ["ssm:GetParameters", "ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
+        "Resource" : [
           "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-bucket",
           "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-table",
           "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/region",
@@ -336,7 +336,7 @@ resource "aws_iam_policy" "github_actions_policy" {
         ]
       },
       {
-        "Sid" : "LogsCloudWatchGlobal",
+        "Sid" : "TerraformCloudWatchAccess",
         "Effect" : "Allow",
         "Action" : [
           "logs:CreateLogGroup",
@@ -347,73 +347,30 @@ resource "aws_iam_policy" "github_actions_policy" {
           "logs:ListTagsForResource",
           "logs:PutLogEvents",
           "logs:PutRetentionPolicy",
-          "logs:TagResource"
+          "logs:TagResource",
+          "cloudwatch:PutDashboard",
+          "cloudwatch:GetDashboard",
+          "cloudwatch:ListDashboards",
+          "cloudwatch:DeleteDashboards"
         ],
         "Resource" : "*"
       },
       {
-        "Sid" : "CloudWatchRoleManagement",
+        "Sid" : "TerraformAPIGatewayAccess",
         "Effect" : "Allow",
         "Action" : [
-          "iam:CreateRole",
-          "iam:DeleteRole",
-          "iam:AttachRolePolicy",
-          "iam:PutRolePolicy",
-          "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListRolePolicies",
-          "iam:ListAttachedRolePolicies",
-          "iam:PassRole",
-          "iam:TagRole",
-          "iam:ListInstanceProfilesForRole"
-        ],
-        "Resource" : "arn:aws:iam::${var.aws_account_id}:role/*"
-      },
-      {
-        "Sid" : "AllowPolicyManagement",
-        "Effect" : "Allow",
-        "Action" : [
-          "iam:CreatePolicy",
-          "iam:DeletePolicy",
-          "iam:GetPolicy",
-          "iam:GetPolicyVersion",
-          "iam:ListPolicies",
-          "iam:ListPolicyVersions",
-          "iam:TagPolicy"
-        ],
-        "Resource" : "arn:aws:iam::${var.aws_account_id}:policy/*"
-      },
-      {
-        Sid    = "CRUDAPIGateway"
-        Effect = "Allow"
-        Action = [
           "apigateway:PUT",
           "apigateway:POST",
           "apigateway:GET",
           "apigateway:PATCH",
           "apigateway:DELETE",
           "apigateway:TagResource"
-        ]
-        Resource = [
+        ],
+        "Resource" : [
           "arn:aws:apigateway:${var.region}::/restapis",
           "arn:aws:apigateway:${var.region}::/restapis/*",
           "arn:aws:apigateway:${var.region}::/tags/*",
           "arn:aws:apigateway:${var.region}::/account"
-        ]
-      },
-      {
-        "Sid" : "CloudWatchDashboardAccess",
-        "Effect" : "Allow",
-        "Action" : [
-          "cloudwatch:PutDashboard",
-          "cloudwatch:GetDashboard",
-          "cloudwatch:ListDashboards",
-          "cloudwatch:DeleteDashboards"
-        ],
-        "Resource" : [
-          "arn:aws:cloudwatch::${var.aws_account_id}:dashboard/serverless-api-dev-dashboard",
-          "arn:aws:cloudwatch::${var.aws_account_id}:dashboard/serverless-api-test-dashboard",
-          "arn:aws:cloudwatch::${var.aws_account_id}:dashboard/serverless-api-prod-dashboard"
         ]
       }
     ]
