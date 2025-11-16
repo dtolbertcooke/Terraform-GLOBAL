@@ -51,7 +51,7 @@ jobs:
       # 7a. Destroy global backend resources
       - name: Destroy (Global)
         working-directory: global-backend
-        run: terraform destroy -var-file=global.tfvars -var="aws_account_id=${{ secrets.AWS_ACCOUNT_ID }}" -auto-approve -lock=false # -lock=false to avoid locking issues on destroy
+        run: terraform destroy -var-file=global.tfvars -var="aws_account_id=${{ vars.AWS_ACCOUNT_ID }}" -auto-approve -lock=false # -lock=false to avoid locking issues on destroy
 
       # 8. Remove backend config from SSM Parameter store (Global)
       - name: Remove Backend Config from SSM Parameter Store (Global)
