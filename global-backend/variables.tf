@@ -13,6 +13,10 @@ variable "state_table_name" {
   description = "Name of the DynamoDB table for Terraform locks"
   type        = string
 }
+variable "lambda_code_bucket" {
+  description = "The S3 bucket for lambda code zip files"
+  type        = string
+}
 variable "environment" {
   description = "Environment (dev, test, prod) for resources"
   type        = string
