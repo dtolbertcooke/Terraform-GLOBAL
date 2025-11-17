@@ -326,7 +326,8 @@ resource "aws_iam_policy" "terraform_iam" {
           "iam:ListPolicies",
           "iam:TagRole",
           "iam:TagPolicy",
-          "iam:ListRolePolicies"
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies"
         ]
         Resource = [
           "arn:aws:iam::${var.aws_account_id}:role/*",
@@ -382,7 +383,8 @@ resource "aws_iam_policy" "terraform_observability" {
           "logs:DescribeLogStreams",
           "logs:PutLogEvents",
           "logs:PutRetentionPolicy",
-          "logs:TagResource"
+          "logs:TagResource",
+          "logs:ListTagsForResource"
         ]
         Resource = "*"
       },
