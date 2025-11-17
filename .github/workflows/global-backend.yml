@@ -75,6 +75,6 @@ jobs:
           aws ssm put-parameter --name "/tf/global-backend/state-bucket" --value "$STATE_BUCKET" --type String
           aws ssm put-parameter --name "/tf/global-backend/state-table"  --value "$STATE_TABLE"  --type String
           aws ssm put-parameter --name "/tf/global-backend/region" --value "$REGION" --type String
-          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-dev" --value "$DEV_LAMBDA_BUCKET" --type String
-          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-test" --value "$TEST_LAMBDA_BUCKET" --type String
-          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-prod" --value "$PROD_LAMBDA_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/lambda-code-bucket-dev" --value "$DEV_LAMBDA_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/lambda-code-bucket-test" --value "$TEST_LAMBDA_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/lambda-code-bucket-prod" --value "$PROD_LAMBDA_BUCKET" --type String
