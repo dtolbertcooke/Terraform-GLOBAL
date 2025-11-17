@@ -291,7 +291,8 @@ resource "aws_iam_policy" "terraform_networking" {
           "ec2:ReleaseAddress",
           "ec2:DisassociateAddress",
           "ec2:CreateFlowLogs",
-          "ec2:DeleteFlowLogs"
+          "ec2:DeleteFlowLogs",
+          "ec2:CreateTags"
         ]
         Resource = "*"
       }
@@ -324,7 +325,8 @@ resource "aws_iam_policy" "terraform_iam" {
           "iam:ListRoles",
           "iam:ListPolicies",
           "iam:TagRole",
-          "iam:TagPolicy"
+          "iam:TagPolicy",
+          "iam:ListRolePolicies"
         ]
         Resource = [
           "arn:aws:iam::${var.aws_account_id}:role/*",
