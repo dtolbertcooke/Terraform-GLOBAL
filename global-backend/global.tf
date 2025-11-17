@@ -292,7 +292,8 @@ resource "aws_iam_policy" "terraform_networking" {
           "ec2:DisassociateAddress",
           "ec2:CreateFlowLogs",
           "ec2:DeleteFlowLogs",
-          "ec2:CreateTags"
+          "ec2:CreateTags",
+          "ec2:ReplaceNetworkAclAssociation"
         ]
         Resource = "*"
       }
