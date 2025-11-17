@@ -41,36 +41,54 @@ module "github-oidc-dev" {
   source  = "terraform-module/github-oidc-provider/aws"
   version = "2.2.1"
 
-  create_oidc_provider      = true # only create provider once
-  create_oidc_role          = true
-  role_name                 = "github-oidc-role-dev"
-  github_thumbprint         = "6938fd4d98bab03faadb97b34396831e3780aea1"
-  oidc_role_attach_policies = [aws_iam_policy.github_actions_policy.arn] # attach oidc policy created above
-  repositories              = ["dtolbertcooke/*"]                        # allow ALL repos under my GitHub
+  create_oidc_provider = true # only create provider once
+  create_oidc_role     = true
+  role_name            = "github-oidc-role-dev"
+  github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
+  oidc_role_attach_policies = [
+    aws_iam_policy.terraform_backend_storage.arn,
+    aws_iam_policy.terraform_serverless.arn,
+    aws_iam_policy.terraform_networking.arn,
+    aws_iam_policy.terraform_iam.arn,
+    aws_iam_policy.terraform_observability.arn
+  ]
+  repositories = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
 }
 module "github-oidc-test" {
   source  = "terraform-module/github-oidc-provider/aws"
   version = "2.2.1"
 
-  create_oidc_provider      = false # ony create provider once
-  create_oidc_role          = true
-  role_name                 = "github-oidc-role-test"
-  github_thumbprint         = "6938fd4d98bab03faadb97b34396831e3780aea1"
-  oidc_role_attach_policies = [aws_iam_policy.github_actions_policy.arn] # attach oidc policy created above
-  repositories              = ["dtolbertcooke/*"]                        # allow ALL repos under my GitHub
-  oidc_provider_arn         = module.github-oidc-dev.oidc_provider_arn
+  create_oidc_provider = false # ony create provider once
+  create_oidc_role     = true
+  role_name            = "github-oidc-role-test"
+  github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
+  oidc_role_attach_policies = [
+    aws_iam_policy.terraform_backend_storage.arn,
+    aws_iam_policy.terraform_serverless.arn,
+    aws_iam_policy.terraform_networking.arn,
+    aws_iam_policy.terraform_iam.arn,
+    aws_iam_policy.terraform_observability.arn
+  ]
+  repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
+  oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
 }
 module "github-oidc-prod" {
   source  = "terraform-module/github-oidc-provider/aws"
   version = "2.2.1"
 
-  create_oidc_provider      = false # only create provider once
-  create_oidc_role          = true
-  role_name                 = "github-oidc-role-prod"
-  github_thumbprint         = "6938fd4d98bab03faadb97b34396831e3780aea1"
-  oidc_role_attach_policies = [aws_iam_policy.github_actions_policy.arn] # attach oidc policy created above
-  repositories              = ["dtolbertcooke/*"]                        # allow ALL repos under my GitHub
-  oidc_provider_arn         = module.github-oidc-dev.oidc_provider_arn
+  create_oidc_provider = false # only create provider once
+  create_oidc_role     = true
+  role_name            = "github-oidc-role-prod"
+  github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
+  oidc_role_attach_policies = [
+    aws_iam_policy.terraform_backend_storage.arn,
+    aws_iam_policy.terraform_serverless.arn,
+    aws_iam_policy.terraform_networking.arn,
+    aws_iam_policy.terraform_iam.arn,
+    aws_iam_policy.terraform_observability.arn
+  ]
+  repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
+  oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
 }
 
 # OIDC policies to be used by all (dev, test, prod) github oidc roles
@@ -146,9 +164,9 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         ]
       },
       {
-        Sid    = "TerraformDynamoDBCreate"
-        Effect = "Allow"
-        Action = ["dynamodb:CreateTable"]
+        Sid      = "TerraformDynamoDBCreate"
+        Effect   = "Allow"
+        Action   = ["dynamodb:CreateTable"]
         Resource = "*"
         Condition = {
           StringLike = {
@@ -183,7 +201,7 @@ resource "aws_iam_policy" "terraform_serverless" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "LambdaCRUD"
+        Sid    = "LambdaCRUD"
         Effect = "Allow"
         Action = [
           "lambda:CreateFunction",
@@ -198,7 +216,7 @@ resource "aws_iam_policy" "terraform_serverless" {
         Resource = "*"
       },
       {
-        Sid = "APIGatewayCRUD"
+        Sid    = "APIGatewayCRUD"
         Effect = "Allow"
         Action = [
           "apigateway:GET",
@@ -215,7 +233,7 @@ resource "aws_iam_policy" "terraform_serverless" {
         ]
       },
       {
-        Sid = "AutoScaling"
+        Sid    = "AutoScaling"
         Effect = "Allow"
         Action = [
           "application-autoscaling:RegisterScalableTarget",
@@ -238,7 +256,7 @@ resource "aws_iam_policy" "terraform_networking" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "NetworkingCRUD"
+        Sid    = "NetworkingCRUD"
         Effect = "Allow"
         Action = [
           "ec2:CreateVpc",
@@ -288,7 +306,7 @@ resource "aws_iam_policy" "terraform_iam" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "IAMManage"
+        Sid    = "IAMManage"
         Effect = "Allow"
         Action = [
           "iam:CreateRole",
@@ -314,7 +332,7 @@ resource "aws_iam_policy" "terraform_iam" {
         ]
       },
       {
-        Sid = "IAMPassRole"
+        Sid    = "IAMPassRole"
         Effect = "Allow"
         Action = "iam:PassRole"
         Resource = [
@@ -333,7 +351,7 @@ resource "aws_iam_policy" "terraform_iam" {
         }
       },
       {
-        Sid = "AssumeOIDCRoles"
+        Sid    = "AssumeOIDCRoles"
         Effect = "Allow"
         Action = ["sts:AssumeRole"]
         Resource = [
@@ -353,7 +371,7 @@ resource "aws_iam_policy" "terraform_observability" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid = "CloudWatchLogs"
+        Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
@@ -367,7 +385,7 @@ resource "aws_iam_policy" "terraform_observability" {
         Resource = "*"
       },
       {
-        Sid = "CloudWatchDashboards"
+        Sid    = "CloudWatchDashboards"
         Effect = "Allow"
         Action = [
           "cloudwatch:PutDashboard",
