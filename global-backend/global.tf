@@ -73,30 +73,26 @@ module "github-oidc-prod" {
   oidc_provider_arn         = module.github-oidc-dev.oidc_provider_arn
 }
 
-# OIDC policy to be used by all (dev, test, prod) github oidc roles
-resource "aws_iam_policy" "github_actions_policy" {
-  name = "github-oidc-role-terraform-policy"
+# OIDC policies to be used by all (dev, test, prod) github oidc roles
+# policy 1
+resource "aws_iam_policy" "terraform_backend_storage" {
+  name = "terraform-backend-storage"
   policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [
+    Version = "2012-10-17",
+    Statement = [
       {
-        "Sid" : "TerraformS3BucketAccess",
-        "Effect" : "Allow",
-        "Action" : [
-          "s3:DeleteObject",
+        Sid    = "TerraformS3Access"
+        Effect = "Allow"
+        Action = [
           "s3:GetBucketVersioning",
           "s3:PutBucketVersioning",
           "s3:GetBucketPolicy",
           "s3:PutBucketPolicy",
           "s3:GetEncryptionConfiguration",
-          "s3:GetBucketPublicAccessBlock",
           "s3:PutEncryptionConfiguration",
+          "s3:GetBucketPublicAccessBlock",
           "s3:PutBucketPublicAccessBlock",
-          "s3:GetReplicationConfiguration",
           "s3:GetLifecycleConfiguration",
-          "s3:GetBucketWebsite",
-          "s3:GetBucketRequestPayment",
-          "s3:GetBucketObjectLockConfiguration",
           "s3:GetBucketLogging",
           "s3:GetBucketCORS",
           "s3:GetBucketAcl",
@@ -104,9 +100,10 @@ resource "aws_iam_policy" "github_actions_policy" {
           "s3:GetObjectTagging",
           "s3:GetObject",
           "s3:PutObject",
+          "s3:DeleteObject",
           "s3:ListBucket"
-        ],
-        "Resource" : [
+        ]
+        Resource = [
           "arn:aws:s3:::${module.s3_state_bucket.bucket_name}",
           "arn:aws:s3:::${module.s3_state_bucket.bucket_name}/*",
           "arn:aws:s3:::${module.lambda_code_bucket_dev.bucket_name}",
@@ -118,48 +115,44 @@ resource "aws_iam_policy" "github_actions_policy" {
         ]
       },
       {
-        "Sid" : "TerraformS3Global",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid    = "TerraformS3Create"
+        Effect = "Allow"
+        Action = [
           "s3:CreateBucket",
           "s3:GetBucketLocation",
           "s3:HeadBucket",
           "s3:GetBucketTagging",
           "s3:PutBucketTagging",
           "s3:PutBucketAcl"
-        ],
-        "Resource" : "*"
+        ]
+        Resource = "*"
       },
       {
-        "Sid" : "TerraformDynamoDBAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid    = "TerraformDynamoDBAccess"
+        Effect = "Allow"
+        Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:UpdateTable",
-          "dynamodb:DeleteTable",
           "dynamodb:DeleteItem",
           "dynamodb:TagResource",
           "dynamodb:DescribeTable",
-          "dynamodb:UpdateContinuousBackups",
-          "dynamodb:DescribeTimeToLive",
-          "dynamodb:DescribeContinuousBackups",
           "dynamodb:ListTagsOfResource"
-        ],
-        "Resource" : [
+        ]
+        Resource = [
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/fruit-api-lock-table-${var.environment}",
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/fruit-api-table-*",
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/${module.dynamodb_state_table.state_table_name}"
         ]
       },
       {
-        "Sid" : "TerraformDynamoDBGlobal",
-        "Effect" : "Allow",
-        "Action" : ["dynamodb:CreateTable"],
-        "Resource" : "*",
-        "Condition" : {
-          "StringLike" : {
-            "dynamodb:TableName" : [
+        Sid    = "TerraformDynamoDBCreate"
+        Effect = "Allow"
+        Action = ["dynamodb:CreateTable"]
+        Resource = "*"
+        Condition = {
+          StringLike = {
+            "dynamodb:TableName" = [
               "fruit-api-lock-table-*",
               "fruit-api-table-*"
             ]
@@ -167,57 +160,94 @@ resource "aws_iam_policy" "github_actions_policy" {
         }
       },
       {
-        "Sid" : "TerraformLambdaAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid    = "TerraformSSMAccess"
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:PutParameter",
+          "ssm:DeleteParameter"
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/*"
+        ]
+      }
+    ]
+  })
+}
+
+# policy 2
+resource "aws_iam_policy" "terraform_serverless" {
+  name = "terraform-serverless"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid = "LambdaCRUD"
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateFunction",
           "lambda:UpdateFunctionCode",
           "lambda:GetFunction",
           "lambda:DeleteFunction",
           "lambda:GetPolicy",
           "lambda:ListVersionsByFunction",
-          "lambda:GetFunctionCodeSigningConfig",
           "lambda:AddPermission",
           "lambda:TagResource"
-        ],
-        "Resource" : [
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-GET*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PUT*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-PATCH*",
-          "arn:aws:lambda:${var.region}:${var.aws_account_id}:function:fruit-api-DELETE*"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid = "APIGatewayCRUD"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET",
+          "apigateway:POST",
+          "apigateway:PUT",
+          "apigateway:PATCH",
+          "apigateway:DELETE",
+          "apigateway:TagResource"
+        ]
+        Resource = [
+          "arn:aws:apigateway:${var.region}::/restapis/*",
+          "arn:aws:apigateway:${var.region}::/account",
+          "arn:aws:apigateway:${var.region}::/tags/*"
         ]
       },
       {
-        "Sid" : "TerraformLambdaGlobal",
-        "Effect" : "Allow",
-        "Action" : "lambda:CreateFunction",
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "TerraformAutoScalingAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid = "AutoScaling"
+        Effect = "Allow"
+        Action = [
           "application-autoscaling:RegisterScalableTarget",
           "application-autoscaling:PutScalingPolicy",
           "application-autoscaling:DeleteScalingPolicy",
           "application-autoscaling:DescribeScalingPolicies",
           "application-autoscaling:DescribeScalableTargets",
           "application-autoscaling:ListTagsForResource"
-        ],
-        "Resource" : "*"
-      },
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# policy 3
+resource "aws_iam_policy" "terraform_networking" {
+  name = "terraform-networking"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
       {
-        "Sid" : "TerraformNetworkingAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid = "NetworkingCRUD"
+        Effect = "Allow"
+        Action = [
           "ec2:CreateVpc",
           "ec2:DeleteVpc",
-          "ec2:DescribeVpcs",
+          "ec2:Describe*",
           "ec2:CreateSubnet",
           "ec2:DeleteSubnet",
-          "ec2:DescribeSubnets",
           "ec2:CreateNatGateway",
           "ec2:DeleteNatGateway",
-          "ec2:DescribeNatGateways",
           "ec2:CreateInternetGateway",
           "ec2:DeleteInternetGateway",
           "ec2:AttachInternetGateway",
@@ -234,39 +264,33 @@ resource "aws_iam_policy" "github_actions_policy" {
           "ec2:AuthorizeSecurityGroupEgress",
           "ec2:RevokeSecurityGroupIngress",
           "ec2:RevokeSecurityGroupEgress",
-          "ec2:DescribeSecurityGroups",
           "ec2:CreateNetworkAcl",
           "ec2:DeleteNetworkAcl",
           "ec2:CreateNetworkAclEntry",
           "ec2:DeleteNetworkAclEntry",
-          "ec2:DescribeNetworkAcls",
-          "ec2:CreateTags",
-          "ec2:DeleteTags",
-          "ec2:DescribeTags",
           "ec2:ModifyVpcAttribute",
           "ec2:AllocateAddress",
-          "ec2:DescribeAddresses",
-          "ec2:DescribeVpcAttribute",
-          "ec2:DescribeVpcClassicLinkDnsSupport",
-          "ec2:DescribeVpcClassicLink",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeInternetGateways",
-          "ec2:DescribeSecurityGroupRules",
-          "ec2:ReplaceNetworkAclAssociation",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DisassociateAddress",
           "ec2:ReleaseAddress",
-          "ec2:DescribeAddressesAttribute",
+          "ec2:DisassociateAddress",
           "ec2:CreateFlowLogs",
-          "ec2:DeleteFlowLogs",
-          "ec2:DescribeFlowLogs"
-        ],
-        "Resource" : "*"
-      },
+          "ec2:DeleteFlowLogs"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# policy 4
+resource "aws_iam_policy" "terraform_iam" {
+  name = "terraform-iam"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
       {
-        "Sid" : "TerraformIAMAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid = "IAMManage"
+        Effect = "Allow"
+        Action = [
           "iam:CreateRole",
           "iam:DeleteRole",
           "iam:AttachRolePolicy",
@@ -276,35 +300,31 @@ resource "aws_iam_policy" "github_actions_policy" {
           "iam:CreatePolicy",
           "iam:DeletePolicy",
           "iam:GetRole",
-          "iam:GetRolePolicy",
-          "iam:ListRoles",
-          "iam:ListRolePolicies",
-          "iam:ListAttachedRolePolicies",
-          "iam:ListPolicies",
           "iam:GetPolicy",
+          "iam:GetRolePolicy",
           "iam:GetPolicyVersion",
-          "iam:ListPolicyVersions",
+          "iam:ListRoles",
+          "iam:ListPolicies",
           "iam:TagRole",
-          "iam:TagPolicy",
-          "iam:ListInstanceProfilesForRole"
-        ],
-        "Resource" : [
+          "iam:TagPolicy"
+        ]
+        Resource = [
           "arn:aws:iam::${var.aws_account_id}:role/*",
           "arn:aws:iam::${var.aws_account_id}:policy/*"
         ]
       },
       {
-        "Sid" : "TerraformIAMPassRoleConditioned",
-        "Effect" : "Allow",
-        "Action" : "iam:PassRole",
-        "Resource" : [
+        Sid = "IAMPassRole"
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = [
           "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-*",
           "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-*",
           "arn:aws:iam::${var.aws_account_id}:role/vpc-flow-log-role-*"
-        ],
-        "Condition" : {
-          "StringEquals" : {
-            "iam:PassedToService" : [
+        ]
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = [
               "lambda.amazonaws.com",
               "apigateway.amazonaws.com",
               "vpc-flow-logs.amazonaws.com"
@@ -313,68 +333,50 @@ resource "aws_iam_policy" "github_actions_policy" {
         }
       },
       {
-        "Sid" : "TerraformAssumeRole",
-        "Effect" : "Allow",
-        "Action" : ["sts:AssumeRole"],
-        "Resource" : [
+        Sid = "AssumeOIDCRoles"
+        Effect = "Allow"
+        Action = ["sts:AssumeRole"]
+        Resource = [
           "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-dev",
           "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-test",
           "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-prod"
         ]
-      },
+      }
+    ]
+  })
+}
+
+# policy 5
+resource "aws_iam_policy" "terraform_observability" {
+  name = "terraform-observability"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
       {
-        "Sid" : "TerraformSSMAccess",
-        "Effect" : "Allow",
-        "Action" : ["ssm:GetParameters", "ssm:GetParameter", "ssm:PutParameter", "ssm:DeleteParameter"],
-        "Resource" : [
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-bucket",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/state-table",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/region",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/app-table-dev",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/app-table-test",
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/app-table-prod"
-        ]
-      },
-      {
-        "Sid" : "TerraformCloudWatchAccess",
-        "Effect" : "Allow",
-        "Action" : [
+        Sid = "CloudWatchLogs"
+        Effect = "Allow"
+        Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
-          "logs:ListTagsLogGroup",
-          "logs:ListTagsForResource",
           "logs:PutLogEvents",
           "logs:PutRetentionPolicy",
-          "logs:TagResource",
+          "logs:TagResource"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid = "CloudWatchDashboards"
+        Effect = "Allow"
+        Action = [
           "cloudwatch:PutDashboard",
           "cloudwatch:GetDashboard",
           "cloudwatch:ListDashboards",
           "cloudwatch:DeleteDashboards"
-        ],
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "TerraformAPIGatewayAccess",
-        "Effect" : "Allow",
-        "Action" : [
-          "apigateway:PUT",
-          "apigateway:POST",
-          "apigateway:GET",
-          "apigateway:PATCH",
-          "apigateway:DELETE",
-          "apigateway:TagResource"
-        ],
-        "Resource" : [
-          "arn:aws:apigateway:${var.region}::/restapis",
-          "arn:aws:apigateway:${var.region}::/restapis/*",
-          "arn:aws:apigateway:${var.region}::/tags/*",
-          "arn:aws:apigateway:${var.region}::/account"
         ]
+        Resource = "*"
       }
     ]
-    }
-  )
+  })
 }
-
