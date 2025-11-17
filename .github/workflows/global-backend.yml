@@ -68,11 +68,13 @@ jobs:
           STATE_BUCKET=$(jq -r '.state_bucket_name.value' tf_outputs.json)
           STATE_TABLE=$(jq -r '.state_table_name.value' tf_outputs.json)
           REGION=$(jq -r '.region.value' tf_outputs.json)
+          DEV_LAMBDA_BUCKET=$(jq -r '.lambda_code_bucket_dev_name.value' tf_outputs.json)
+          TEST_LAMBDA_BUCKET=$(jq -r '.lambda_code_bucket_test_name.value' tf_outputs.json)
+          PROD_LAMBDA_BUCKET=$(jq -r '.lambda_code_bucket_prod_name.value' tf_outputs.json)
 
           aws ssm put-parameter --name "/tf/global-backend/state-bucket" --value "$STATE_BUCKET" --type String
           aws ssm put-parameter --name "/tf/global-backend/state-table"  --value "$STATE_TABLE"  --type String
           aws ssm put-parameter --name "/tf/global-backend/region" --value "$REGION" --type String
-
-          echo "STATE_BUCKET=$STATE_BUCKET" >> $GITHUB_ENV
-          echo "STATE_TABLE=$STATE_TABLE" >> $GITHUB_ENV
-          echo "REGION=$REGION" >> $GITHUB_ENV
+          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-dev" --value "$DEV_LAMBDA_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-test" --value "$TEST_LAMBDA_BUCKET" --type String
+          aws ssm put-parameter --name "/tf/global-backend/lambda-bucket-prod" --value "$PROD_LAMBDA_BUCKET" --type String
