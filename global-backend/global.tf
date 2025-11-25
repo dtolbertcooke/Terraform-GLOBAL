@@ -50,7 +50,8 @@ module "github-oidc-dev" {
     aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn
+    aws_iam_policy.terraform_observability.arn,
+    aws_iam_policy.terraform_ecr.arn
   ]
   repositories = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
 }
@@ -67,7 +68,8 @@ module "github-oidc-test" {
     aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn
+    aws_iam_policy.terraform_observability.arn,
+    aws_iam_policy.terraform_ecr.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
@@ -85,7 +87,8 @@ module "github-oidc-prod" {
     aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn
+    aws_iam_policy.terraform_observability.arn,
+    aws_iam_policy.terraform_ecr.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
@@ -138,7 +141,6 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         Action = [
           "s3:CreateBucket",
           "s3:GetBucketLocation",
-          "s3:HeadBucket",
           "s3:GetBucketTagging",
           "s3:PutBucketTagging",
           "s3:PutBucketAcl"
@@ -152,10 +154,14 @@ resource "aws_iam_policy" "terraform_backend_storage" {
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:UpdateTable",
+          "dynamodb:DeleteTable",
           "dynamodb:DeleteItem",
           "dynamodb:TagResource",
           "dynamodb:DescribeTable",
-          "dynamodb:ListTagsOfResource"
+          "dynamodb:ListTagsOfResource",
+          "dynamodb:UpdateContinuousBackups",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive"
         ]
         Resource = [
           "arn:aws:dynamodb:${var.region}:${var.aws_account_id}:table/fruit-api-lock-table-${var.environment}",
@@ -168,14 +174,6 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         Effect   = "Allow"
         Action   = ["dynamodb:CreateTable"]
         Resource = "*"
-        Condition = {
-          StringLike = {
-            "dynamodb:TableName" = [
-              "fruit-api-lock-table-*",
-              "fruit-api-table-*"
-            ]
-          }
-        }
       },
       {
         Sid    = "TerraformSSMAccess"
@@ -211,7 +209,8 @@ resource "aws_iam_policy" "terraform_serverless" {
           "lambda:GetPolicy",
           "lambda:ListVersionsByFunction",
           "lambda:AddPermission",
-          "lambda:TagResource"
+          "lambda:TagResource",
+          "lambda:GetFunctionCodeSigningConfig"
         ]
         Resource = "*"
       },
@@ -223,10 +222,9 @@ resource "aws_iam_policy" "terraform_serverless" {
           "apigateway:POST",
           "apigateway:PUT",
           "apigateway:PATCH",
-          "apigateway:DELETE",
-          "apigateway:TagResource"
-        ]
+        "apigateway:DELETE"]
         Resource = [
+          "arn:aws:apigateway:${var.region}::/restapis",
           "arn:aws:apigateway:${var.region}::/restapis/*",
           "arn:aws:apigateway:${var.region}::/account",
           "arn:aws:apigateway:${var.region}::/tags/*"
@@ -397,6 +395,36 @@ resource "aws_iam_policy" "terraform_observability" {
           "cloudwatch:GetDashboard",
           "cloudwatch:ListDashboards",
           "cloudwatch:DeleteDashboards"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# policy 6
+resource "aws_iam_policy" "terraform_ecr" {
+  name = "terraform-ecr"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "ecr:CompleteLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:InitiateLayerUpload",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:PutImage",
+          "ecr:BatchGetImage"
+        ],
+        "Resource" : "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/dtolbertcooke/*"
+      },
+      {
+        Sid    = "ECRAccess"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
         ]
         Resource = "*"
       }
