@@ -51,7 +51,8 @@ module "github-oidc-dev" {
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
     aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn
+    aws_iam_policy.terraform_ecr.arn,
+    aws_iam_policy.terraform_eks.arn
   ]
   repositories = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
 }
@@ -69,7 +70,8 @@ module "github-oidc-test" {
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
     aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn
+    aws_iam_policy.terraform_ecr.arn,
+    aws_iam_policy.terraform_eks.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
@@ -88,7 +90,8 @@ module "github-oidc-prod" {
     aws_iam_policy.terraform_networking.arn,
     aws_iam_policy.terraform_iam.arn,
     aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn
+    aws_iam_policy.terraform_ecr.arn,
+    aws_iam_policy.terraform_eks.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
@@ -451,6 +454,98 @@ resource "aws_iam_policy" "terraform_ecr" {
           "kms:ScheduleKeyDeletion"
         ]
         Resource = "*"
+      }
+    ]
+  })
+}
+
+# policy 7
+resource "aws_iam_policy" "terraform_eks" {
+  name = "terraform-eks"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Sid" : "EKSClusterManagement",
+        "Effect" : "Allow",
+        "Action" : [
+          "eks:CreateCluster",
+          "eks:DescribeCluster",
+          "eks:DeleteCluster",
+          "eks:UpdateClusterConfig",
+          "eks:UpdateClusterVersion",
+          "eks:ListClusters"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "EKSNodegroupManagement",
+        "Effect" : "Allow",
+        "Action" : [
+          "eks:CreateNodegroup",
+          "eks:DescribeNodegroup",
+          "eks:UpdateNodegroupConfig",
+          "eks:UpdateNodegroupVersion",
+          "eks:DeleteNodegroup"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "EKSAddonManagement",
+        "Effect" : "Allow",
+        "Action" : [
+          "eks:CreateAddon",
+          "eks:DescribeAddon",
+          "eks:DeleteAddon",
+          "eks:UpdateAddon"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "IAMPassRoleForEKS",
+        "Effect" : "Allow",
+        "Action" : "iam:PassRole",
+        "Resource" : [
+          "arn:aws:iam::${var.aws_account_id}:role/*"
+        ],
+        "Condition" : {
+          "StringLike" : {
+            "iam:PassedToService" : [
+              "eks.amazonaws.com",
+              "ec2.amazonaws.com"
+            ]
+          }
+        }
+      },
+      {
+        "Sid" : "EC2ForEKSNetworking",
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeVpcs",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:CreateTags"
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "CloudWatchLogging",
+        "Effect" : "Allow",
+        "Action" : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:DescribeLogGroups",
+          "logs:PutLogEvents",
+          "logs:PutRetentionPolicy"
+        ],
+        "Resource" : "*"
       }
     ]
   })
