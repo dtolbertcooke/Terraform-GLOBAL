@@ -447,6 +447,7 @@ resource "aws_iam_policy" "terraform_ecr" {
           "kms:DescribeKey",
           "kms:TagResource",
           "kms:CreateAlias",
+          "kms:ListAliases",
           "kms:ScheduleKeyDeletion"
         ]
         Resource = "*"
