@@ -409,22 +409,45 @@ resource "aws_iam_policy" "terraform_ecr" {
     Version = "2012-10-17",
     Statement = [
       {
-        "Effect" : "Allow",
-        "Action" : [
+        Sid    = "ECRRepositoryManagement"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository",
+          "ecr:DescribeRepositories",
+          "ecr:DeleteRepository",
+          "ecr:TagResource",
+          "ecr:ListTagsForResource"
+        ]
+        Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/*"
+      },
+      {
+        Sid    = "ECRImageManagement"
+        Effect = "Allow"
+        Action = [
           "ecr:CompleteLayerUpload",
           "ecr:UploadLayerPart",
           "ecr:InitiateLayerUpload",
           "ecr:BatchCheckLayerAvailability",
           "ecr:PutImage",
           "ecr:BatchGetImage"
-        ],
-        "Resource" : "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/dtolbertcooke/*"
+        ]
+        Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/*"
       },
       {
-        Sid    = "ECRAccess"
+        Sid      = "ECRAuth"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Sid    = "KMSForEKS"
         Effect = "Allow"
         Action = [
-          "ecr:GetAuthorizationToken"
+          "kms:CreateKey",
+          "kms:DescribeKey",
+          "kms:TagResource",
+          "kms:CreateAlias",
+          "kms:ScheduleKeyDeletion"
         ]
         Resource = "*"
       }
