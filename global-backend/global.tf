@@ -47,12 +47,10 @@ module "github-oidc-dev" {
   github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
   oidc_role_attach_policies = [
     aws_iam_policy.terraform_backend_storage.arn,
-    aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
-    aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn,
-    aws_iam_policy.terraform_eks.arn
+    aws_iam_policy.terraform_compute_serverless.arn,
+    aws_iam_policy.terraform_containers_and_eks.arn,
+    aws_iam_policy.terraform_iam_and_observability.arn
   ]
   repositories = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
 }
@@ -66,12 +64,10 @@ module "github-oidc-test" {
   github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
   oidc_role_attach_policies = [
     aws_iam_policy.terraform_backend_storage.arn,
-    aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
-    aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn,
-    aws_iam_policy.terraform_eks.arn
+    aws_iam_policy.terraform_compute_serverless.arn,
+    aws_iam_policy.terraform_containers_and_eks.arn,
+    aws_iam_policy.terraform_iam_and_observability.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
@@ -86,26 +82,28 @@ module "github-oidc-prod" {
   github_thumbprint    = "6938fd4d98bab03faadb97b34396831e3780aea1"
   oidc_role_attach_policies = [
     aws_iam_policy.terraform_backend_storage.arn,
-    aws_iam_policy.terraform_serverless.arn,
     aws_iam_policy.terraform_networking.arn,
-    aws_iam_policy.terraform_iam.arn,
-    aws_iam_policy.terraform_observability.arn,
-    aws_iam_policy.terraform_ecr.arn,
-    aws_iam_policy.terraform_eks.arn
+    aws_iam_policy.terraform_compute_serverless.arn,
+    aws_iam_policy.terraform_containers_and_eks.arn,
+    aws_iam_policy.terraform_iam_and_observability.arn
   ]
   repositories      = ["dtolbertcooke/*"] # allow ALL repos under my GitHub
   oidc_provider_arn = module.github-oidc-dev.oidc_provider_arn
 }
 
+
+
+
 # OIDC policies to be used by all (dev, test, prod) github oidc roles
-# policy 1
+# 1 - backend storage policy
 resource "aws_iam_policy" "terraform_backend_storage" {
   name = "terraform-backend-storage"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      # State + code buckets (backend + lambda)
       {
-        Sid    = "TerraformS3Access"
+        Sid    = "TerraformS3StateAndCode"
         Effect = "Allow"
         Action = [
           "s3:GetBucketVersioning",
@@ -139,7 +137,7 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         ]
       },
       {
-        Sid    = "TerraformS3Create"
+        Sid    = "TerraformS3CreateBuckets"
         Effect = "Allow"
         Action = [
           "s3:CreateBucket",
@@ -150,18 +148,19 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         ]
         Resource = "*"
       },
+
+      # DynamoDB state + app tables
       {
-        Sid    = "TerraformDynamoDBAccess"
+        Sid    = "TerraformDynamoDBStateAndApp"
         Effect = "Allow"
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          "dynamodb:UpdateTable",
-          "dynamodb:DeleteTable",
           "dynamodb:DeleteItem",
-          "dynamodb:TagResource",
           "dynamodb:DescribeTable",
           "dynamodb:ListTagsOfResource",
+          "dynamodb:TagResource",
+          "dynamodb:UpdateTable",
           "dynamodb:UpdateContinuousBackups",
           "dynamodb:DescribeContinuousBackups",
           "dynamodb:DescribeTimeToLive"
@@ -173,13 +172,15 @@ resource "aws_iam_policy" "terraform_backend_storage" {
         ]
       },
       {
-        Sid      = "TerraformDynamoDBCreate"
+        Sid      = "TerraformDynamoDBCreateTables"
         Effect   = "Allow"
         Action   = ["dynamodb:CreateTable"]
         Resource = "*"
       },
+
+      # SSM for backend config
       {
-        Sid    = "TerraformSSMAccess"
+        Sid    = "TerraformSSMBackendConfig"
         Effect = "Allow"
         Action = [
           "ssm:GetParameter",
@@ -187,26 +188,100 @@ resource "aws_iam_policy" "terraform_backend_storage" {
           "ssm:PutParameter",
           "ssm:DeleteParameter"
         ]
-        Resource = [
-          "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/*"
-        ]
+        Resource = "arn:aws:ssm:${var.region}:${var.aws_account_id}:parameter/tf/global-backend/*"
       }
     ]
   })
 }
 
-# policy 2
-resource "aws_iam_policy" "terraform_serverless" {
-  name = "terraform-serverless"
+# 2 - networking policy
+resource "aws_iam_policy" "terraform_networking" {
+  name = "terraform-networking"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      {
+        Sid    = "TerraformVPCNetworking"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateVpc",
+          "ec2:DeleteVpc",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeVpcAttribute",
+          "ec2:ModifyVpcAttribute",
+
+          "ec2:CreateSubnet",
+          "ec2:DeleteSubnet",
+          "ec2:DescribeSubnets",
+
+          "ec2:CreateInternetGateway",
+          "ec2:DeleteInternetGateway",
+          "ec2:AttachInternetGateway",
+          "ec2:DetachInternetGateway",
+          "ec2:DescribeInternetGateways",
+
+          "ec2:CreateNatGateway",
+          "ec2:DeleteNatGateway",
+          "ec2:DescribeNatGateways",
+
+          "ec2:CreateRouteTable",
+          "ec2:DeleteRouteTable",
+          "ec2:DescribeRouteTables",
+          "ec2:AssociateRouteTable",
+          "ec2:DisassociateRouteTable",
+          "ec2:CreateRoute",
+          "ec2:DeleteRoute",
+
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSecurityGroupRules",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupEgress",
+
+          "ec2:CreateNetworkAcl",
+          "ec2:DeleteNetworkAcl",
+          "ec2:DescribeNetworkAcls",
+          "ec2:CreateNetworkAclEntry",
+          "ec2:DeleteNetworkAclEntry",
+          "ec2:ReplaceNetworkAclAssociation",
+
+          "ec2:AllocateAddress",
+          "ec2:ReleaseAddress",
+          "ec2:DisassociateAddress",
+          "ec2:DescribeAddresses",
+          "ec2:DescribeAddressesAttribute",
+
+          "ec2:DescribeRegions",
+          "ec2:DescribeNetworkInterfaces",
+
+          "ec2:CreateTags",
+          "ec2:DeleteFlowLogs",
+          "ec2:CreateFlowLogs",
+          "ec2:DescribeFlowLogs"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# 3 - serverless policy
+resource "aws_iam_policy" "terraform_compute_serverless" {
+  name = "terraform-compute-serverless"
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      # Lambda functions for serverless API
       {
         Sid    = "LambdaCRUD"
         Effect = "Allow"
         Action = [
           "lambda:CreateFunction",
           "lambda:UpdateFunctionCode",
+          "lambda:UpdateFunctionConfiguration",
           "lambda:GetFunction",
           "lambda:DeleteFunction",
           "lambda:GetPolicy",
@@ -217,6 +292,8 @@ resource "aws_iam_policy" "terraform_serverless" {
         ]
         Resource = "*"
       },
+
+      # API Gateway for REST API
       {
         Sid    = "APIGatewayCRUD"
         Effect = "Allow"
@@ -225,7 +302,8 @@ resource "aws_iam_policy" "terraform_serverless" {
           "apigateway:POST",
           "apigateway:PUT",
           "apigateway:PATCH",
-        "apigateway:DELETE"]
+          "apigateway:DELETE"
+        ]
         Resource = [
           "arn:aws:apigateway:${var.region}::/restapis",
           "arn:aws:apigateway:${var.region}::/restapis/*",
@@ -233,8 +311,10 @@ resource "aws_iam_policy" "terraform_serverless" {
           "arn:aws:apigateway:${var.region}::/tags/*"
         ]
       },
+
+      # Application Auto Scaling (Lambda / ECS / etc)
       {
-        Sid    = "AutoScaling"
+        Sid    = "ApplicationAutoScaling"
         Effect = "Allow"
         Action = [
           "application-autoscaling:RegisterScalableTarget",
@@ -250,51 +330,123 @@ resource "aws_iam_policy" "terraform_serverless" {
   })
 }
 
-# policy 3
-resource "aws_iam_policy" "terraform_networking" {
-  name = "terraform-networking"
+# 4 - containerization policy
+resource "aws_iam_policy" "terraform_containers_and_eks" {
+  name = "terraform-containers-and-eks"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      # ECR repo + images + auth
       {
-        Sid    = "NetworkingCRUD"
+        Sid    = "ECRRepositoryAndImages"
         Effect = "Allow"
         Action = [
-          "ec2:CreateVpc",
-          "ec2:DeleteVpc",
-          "ec2:Describe*",
-          "ec2:CreateSubnet",
-          "ec2:DeleteSubnet",
-          "ec2:CreateNatGateway",
-          "ec2:DeleteNatGateway",
-          "ec2:CreateInternetGateway",
-          "ec2:DeleteInternetGateway",
-          "ec2:AttachInternetGateway",
-          "ec2:DetachInternetGateway",
-          "ec2:CreateRouteTable",
-          "ec2:DeleteRouteTable",
-          "ec2:CreateRoute",
-          "ec2:DeleteRoute",
-          "ec2:AssociateRouteTable",
-          "ec2:DisassociateRouteTable",
-          "ec2:CreateSecurityGroup",
-          "ec2:DeleteSecurityGroup",
-          "ec2:AuthorizeSecurityGroupIngress",
-          "ec2:AuthorizeSecurityGroupEgress",
-          "ec2:RevokeSecurityGroupIngress",
-          "ec2:RevokeSecurityGroupEgress",
-          "ec2:CreateNetworkAcl",
-          "ec2:DeleteNetworkAcl",
-          "ec2:CreateNetworkAclEntry",
-          "ec2:DeleteNetworkAclEntry",
-          "ec2:ModifyVpcAttribute",
-          "ec2:AllocateAddress",
-          "ec2:ReleaseAddress",
-          "ec2:DisassociateAddress",
-          "ec2:CreateFlowLogs",
-          "ec2:DeleteFlowLogs",
-          "ec2:CreateTags",
-          "ec2:ReplaceNetworkAclAssociation"
+          "ecr:CreateRepository",
+          "ecr:DescribeRepositories",
+          "ecr:DeleteRepository",
+          "ecr:TagResource",
+          "ecr:ListTagsForResource",
+          "ecr:CompleteLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:InitiateLayerUpload",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:PutImage",
+          "ecr:BatchGetImage",
+          "ecr:GetAuthorizationToken",
+          "ecr:GetRegistryScanningConfiguration"
+        ]
+        Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/*"
+      },
+      {
+        Sid      = "ECRAuthWildcard"
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+
+      # EKS cluster / nodegroups / addons / access entry
+      {
+        Sid    = "EKSClusterManagement"
+        Effect = "Allow"
+        Action = [
+          "eks:CreateCluster",
+          "eks:DescribeCluster",
+          "eks:DeleteCluster",
+          "eks:UpdateClusterConfig",
+          "eks:UpdateClusterVersion",
+          "eks:ListClusters",
+          "eks:TagResource"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EKSNodegroupManagement"
+        Effect = "Allow"
+        Action = [
+          "eks:CreateNodegroup",
+          "eks:DescribeNodegroup",
+          "eks:UpdateNodegroupConfig",
+          "eks:UpdateNodegroupVersion",
+          "eks:DeleteNodegroup"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EKSAddonManagement"
+        Effect = "Allow"
+        Action = [
+          "eks:CreateAddon",
+          "eks:DescribeAddon",
+          "eks:UpdateAddon",
+          "eks:DeleteAddon"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EKSAccessEntryManagement"
+        Effect = "Allow"
+        Action = [
+          "eks:CreateAccessEntry",
+          "eks:DeleteAccessEntry",
+          "eks:DescribeAccessEntry",
+          "eks:AssociateAccessPolicy",
+          "eks:DisassociateAccessPolicy",
+          "eks:ListAssociatedAccessPolicies"
+        ]
+        Resource = "*"
+      },
+
+      # EC2 describe for EKS networking (if you ever tighten ec2:Describe* above)
+      {
+        Sid    = "EC2DescribeForEKS"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeVpcs"
+        ]
+        Resource = "*"
+      },
+
+      # KMS for EKS cluster encryption
+      {
+        Sid    = "KMSForEKS"
+        Effect = "Allow"
+        Action = [
+          "kms:CreateKey",
+          "kms:DescribeKey",
+          "kms:TagResource",
+          "kms:CreateAlias",
+          "kms:DeleteAlias",
+          "kms:ListAliases",
+          "kms:ScheduleKeyDeletion",
+          "kms:CreateGrant",
+          "kms:GetKeyPolicy",
+          "kms:GetKeyRotationStatus",
+          "kms:PutKeyPolicy",
+          "kms:EnableKeyRotation",
+          "kms:ListResourceTags"
         ]
         Resource = "*"
       }
@@ -302,14 +454,15 @@ resource "aws_iam_policy" "terraform_networking" {
   })
 }
 
-# policy 4
-resource "aws_iam_policy" "terraform_iam" {
-  name = "terraform-iam"
+# 5 - IAM & Obesrvability policy
+resource "aws_iam_policy" "terraform_iam_and_observability" {
+  name = "terraform-iam-and-observability"
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      # IAM role/policy CRUD for Terraform-managed roles/policies
       {
-        Sid    = "IAMManage"
+        Sid    = "IAMManageTerraformRolesAndPolicies"
         Effect = "Allow"
         Action = [
           "iam:CreateRole",
@@ -336,25 +489,73 @@ resource "aws_iam_policy" "terraform_iam" {
           "arn:aws:iam::${var.aws_account_id}:policy/*"
         ]
       },
+
+      # PassRole to services Terraform wires up
       {
-        Sid    = "IAMPassRole"
-        Effect = "Allow"
-        Action = "iam:PassRole"
-        Resource = [
-          "arn:aws:iam::${var.aws_account_id}:role/lambda-execution-role-*",
-          "arn:aws:iam::${var.aws_account_id}:role/apigw-cloudwatch-logs-role-*",
-          "arn:aws:iam::${var.aws_account_id}:role/vpc-flow-log-role-*"
-        ]
+        Sid      = "IAMPassRole"
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::${var.aws_account_id}:role/*"
         Condition = {
-          StringEquals = {
+          StringLike = {
             "iam:PassedToService" = [
               "lambda.amazonaws.com",
               "apigateway.amazonaws.com",
-              "vpc-flow-logs.amazonaws.com"
+              "vpc-flow-logs.amazonaws.com",
+              "eks.amazonaws.com",
+              "ec2.amazonaws.com"
             ]
           }
         }
       },
+
+      # OIDC provider for GitHub
+      {
+        Sid    = "OIDCProviderManagement"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider"
+        ]
+        Resource = "arn:aws:iam::${var.aws_account_id}:oidc-provider/*"
+      },
+
+      # Service-linked roles (EKS, etc)
+      {
+        Sid    = "IAMServiceLinkedRoles"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole",
+          "iam:GetRole",
+          "iam:ListInstanceProfilesForRole",
+          "iam:ListRoleTags",
+          "iam:ListAttachedRolePolicies"
+        ]
+        Resource = "arn:aws:iam::${var.aws_account_id}:role/*"
+      },
+
+      # STS + account info (Terraform provider & modules often use these)
+      {
+        Sid    = "AccountIntrospection"
+        Effect = "Allow"
+        Action = [
+          "sts:GetCallerIdentity",
+          "iam:ListAccountAliases",
+          "iam:ListUsers",
+          "iam:GetUser",
+          "iam:ListMFADevices",
+          "iam:GetAccessKeyLastUsed",
+          "iam:GetLoginProfile",
+          "iam:ListAccessKeys",
+          "iam:ListAttachedUserPolicies",
+          "iam:ListSigningCertificates",
+          "tag:GetResources"
+        ]
+        Resource = "*"
+      },
+
+      # Allow assuming your own GitHub OIDC roles (if you use this pattern)
       {
         Sid    = "AssumeOIDCRoles"
         Effect = "Allow"
@@ -364,25 +565,19 @@ resource "aws_iam_policy" "terraform_iam" {
           "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-test",
           "arn:aws:iam::${var.aws_account_id}:role/github-oidc-role-prod"
         ]
-      }
-    ]
-  })
-}
+      },
 
-# policy 5
-resource "aws_iam_policy" "terraform_observability" {
-  name = "terraform-observability"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
+      # CloudWatch Logs
       {
         Sid    = "CloudWatchLogs"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
           "logs:CreateLogStream",
           "logs:DescribeLogGroups",
           "logs:DescribeLogStreams",
+          "logs:DescribeMetricFilters",
           "logs:PutLogEvents",
           "logs:PutRetentionPolicy",
           "logs:TagResource",
@@ -390,6 +585,8 @@ resource "aws_iam_policy" "terraform_observability" {
         ]
         Resource = "*"
       },
+
+      # CloudWatch dashboards
       {
         Sid    = "CloudWatchDashboards"
         Effect = "Allow"
@@ -397,7 +594,18 @@ resource "aws_iam_policy" "terraform_observability" {
           "cloudwatch:PutDashboard",
           "cloudwatch:GetDashboard",
           "cloudwatch:ListDashboards",
-          "cloudwatch:DeleteDashboards"
+          "cloudwatch:DeleteDashboards",
+          "cloudwatch:DescribeAlarms"
+        ]
+        Resource = "*"
+      },
+
+      # CloudTrail (used by Access Analyzer / policy generation)
+      {
+        Sid    = "CloudTrailList"
+        Effect = "Allow"
+        Action = [
+          "cloudtrail:ListTrails"
         ]
         Resource = "*"
       }
@@ -405,148 +613,3 @@ resource "aws_iam_policy" "terraform_observability" {
   })
 }
 
-# policy 6
-resource "aws_iam_policy" "terraform_ecr" {
-  name = "terraform-ecr"
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Sid    = "ECRRepositoryManagement"
-        Effect = "Allow"
-        Action = [
-          "ecr:CreateRepository",
-          "ecr:DescribeRepositories",
-          "ecr:DeleteRepository",
-          "ecr:TagResource",
-          "ecr:ListTagsForResource"
-        ]
-        Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/*"
-      },
-      {
-        Sid    = "ECRImageManagement"
-        Effect = "Allow"
-        Action = [
-          "ecr:CompleteLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:InitiateLayerUpload",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:PutImage",
-          "ecr:BatchGetImage"
-        ]
-        Resource = "arn:aws:ecr:${var.region}:${var.aws_account_id}:repository/*"
-      },
-      {
-        Sid      = "ECRAuth"
-        Effect   = "Allow"
-        Action   = ["ecr:GetAuthorizationToken"]
-        Resource = "*"
-      },
-      {
-        Sid    = "KMSForEKS"
-        Effect = "Allow"
-        Action = [
-          "kms:CreateKey",
-          "kms:DescribeKey",
-          "kms:TagResource",
-          "kms:CreateAlias",
-          "kms:ListAliases",
-          "kms:ScheduleKeyDeletion"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# policy 7
-resource "aws_iam_policy" "terraform_eks" {
-  name = "terraform-eks"
-  policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [
-      {
-        "Sid" : "EKSClusterManagement",
-        "Effect" : "Allow",
-        "Action" : [
-          "eks:CreateCluster",
-          "eks:DescribeCluster",
-          "eks:DeleteCluster",
-          "eks:UpdateClusterConfig",
-          "eks:UpdateClusterVersion",
-          "eks:ListClusters"
-        ],
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "EKSNodegroupManagement",
-        "Effect" : "Allow",
-        "Action" : [
-          "eks:CreateNodegroup",
-          "eks:DescribeNodegroup",
-          "eks:UpdateNodegroupConfig",
-          "eks:UpdateNodegroupVersion",
-          "eks:DeleteNodegroup"
-        ],
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "EKSAddonManagement",
-        "Effect" : "Allow",
-        "Action" : [
-          "eks:CreateAddon",
-          "eks:DescribeAddon",
-          "eks:DeleteAddon",
-          "eks:UpdateAddon"
-        ],
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "IAMPassRoleForEKS",
-        "Effect" : "Allow",
-        "Action" : "iam:PassRole",
-        "Resource" : [
-          "arn:aws:iam::${var.aws_account_id}:role/*"
-        ],
-        "Condition" : {
-          "StringLike" : {
-            "iam:PassedToService" : [
-              "eks.amazonaws.com",
-              "ec2.amazonaws.com"
-            ]
-          }
-        }
-      },
-      {
-        "Sid" : "EC2ForEKSNetworking",
-        "Effect" : "Allow",
-        "Action" : [
-          "ec2:DescribeSubnets",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeVpcs",
-          "ec2:CreateSecurityGroup",
-          "ec2:DeleteSecurityGroup",
-          "ec2:AuthorizeSecurityGroupIngress",
-          "ec2:AuthorizeSecurityGroupEgress",
-          "ec2:RevokeSecurityGroupIngress",
-          "ec2:RevokeSecurityGroupEgress",
-          "ec2:CreateTags"
-        ],
-        "Resource" : "*"
-      },
-      {
-        "Sid" : "CloudWatchLogging",
-        "Effect" : "Allow",
-        "Action" : [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:DescribeLogGroups",
-          "logs:PutLogEvents",
-          "logs:PutRetentionPolicy"
-        ],
-        "Resource" : "*"
-      }
-    ]
-  })
-}
